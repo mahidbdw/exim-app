@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HS Code Finder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #151b2e;
+            --bg-card: #1e2842;
+            --accent: #00d9ff;
+            --accent-glow: rgba(0, 217, 255, 0.3);
+            --text-primary: #e8edf4;
+            --text-secondary: #8a94a8;
+            --border: rgba(255, 255, 255, 0.1);
+            --success: #00ff88;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(at 20% 30%, rgba(0, 217, 255, 0.08) 0px, transparent 50%),
+                radial-gradient(at 80% 70%, rgba(0, 255, 136, 0.06) 0px, transparent 50%);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--success) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            font-weight: 300;
+        }
+
+        .loading-section {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .loading-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--accent-glow) 0%, transparent 100%);
+            opacity: 0.3;
+        }
+
+        .loader {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 20px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .search-section {
+            margin-bottom: 40px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .search-section.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .search-wrapper {
+            position: relative;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+        }
+
+        #searchInput {
+            width: 100%;
+            padding: 18px 20px 18px 56px;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        #searchInput:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+        }
+
+        #searchInput::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .results-info {
+            margin-top: 16px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+
+        .results-count {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .results-container {
+            display: grid;
+            gap: 16px;
+        }
+
+        .result-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-item:hover {
+            border-color: var(--accent);
+            transform: translateX(4px);
+            box-shadow: -4px 0 0 var(--accent);
+        }
+
+        .hs-code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: var(--accent);
+            margin-bottom: 12px;
+            letter-spacing: 0.05em;
+        }
+
+        .commodity-list {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .highlight {
+            background: var(--accent-glow);
+            color: var(--accent);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .no-results-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .status-message {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--success);
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .error-message {
+            border-left-color: #ff4444 !important;
+        }
+
+        .file-name {
+            color: var(--accent);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stats {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            background: var(--bg-card);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .stat-value {
+            color: var(--accent);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>HS Code Finder</h1>
+            <p class="subtitle">Search commodities and find their harmonized system codes</p>
+        </header>
+
+        <div class="loading-section" id="loadingSection">
+            <div class="loader"></div>
+            <div class="loading-text">Loading HS code data...</div>
+        </div>
+
+        <div id="statusMessage"></div>
+
+        <div class="search-section" id="searchSection">
+            <div class="search-wrapper">
+                <span class="search-icon">🔍</span>
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Start typing to search commodities..."
+                    autocomplete="off"
+                />
+            </div>
+            <div class="results-info" id="resultsInfo"></div>
+        </div>
+
+        <div class="results-container" id="resultsContainer"></div>
+    </div>
+
+    <script>
+        // CONFIGURATION: Set your Excel file name here
+        const EXCEL_FILE_NAME = 'hs-codes.xlsx'; // Change this to your actual file name
+        
+        let hsData = [];
+        const searchInput = document.getElementById('searchInput');
+        const searchSection = document.getElementById('searchSection');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsInfo = document.getElementById('resultsInfo');
+        const statusMessage = document.getElementById('statusMessage');
+        const loadingSection = document.getElementById('loadingSection');
+
+        // Auto-load Excel file on page load
+        window.addEventListener('DOMContentLoaded', loadExcelFile);
+        searchInput.addEventListener('input', handleSearch);
+
+        async function loadExcelFile() {
+            try {
+                // Fetch the Excel file from the same directory
+                const response = await fetch(EXCEL_FILE_NAME);
+                
+                if (!response.ok) {
+                    throw new Error(`File not found: ${EXCEL_FILE_NAME}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const data = new Uint8Array(arrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Get first sheet
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                
+                // Parse data (assuming column 0 is HS code, column 1 is commodities)
+                hsData = jsonData
+                    .filter(row => row[0] && row[1]) // Filter out empty rows
+                    .map(row => ({
+                        hsCode: String(row[0]).trim(),
+                        commodities: String(row[1]).split(',').map(c => c.trim()).filter(c => c)
+                    }));
+                
+                // Count total commodities
+                const totalCommodities = hsData.reduce((sum, item) => sum + item.commodities.length, 0);
+                
+                loadingSection.style.display = 'none';
+                showStatus(`
+                    Successfully loaded data from <span class="file-name">${EXCEL_FILE_NAME}</span>
+                    <div class="stats">
+                        <div class="stat-item">
+                            <span class="stat-value">${hsData.length}</span> HS Codes
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">${totalCommodities}</span> Commodities
+                        </div>
+                    </div>
+                `);
+                searchSection.classList.add('active');
+                searchInput.focus();
+            } catch (error) {
+                loadingSection.style.display = 'none';
+                showStatus(`
+                    <div class="error-message">
+                        Error loading file: ${error.message}<br>
+                        <small style="margin-top: 8px; display: block;">
+                            Make sure <span class="file-name">${EXCEL_FILE_NAME}</span> is in the same directory as this HTML file.
+                        </small>
+                    </div>
+                `, true);
+                console.error('Error loading Excel file:', error);
+            }
+        }
+
+        function handleSearch(e) {
+            const query = e.target.value.toLowerCase().trim();
+            
+            if (!query) {
+                resultsContainer.innerHTML = '';
+                resultsInfo.innerHTML = '';
+                return;
+            }
+
+            // Search through all HS codes and their commodities
+            const results = hsData.filter(item => 
+                item.commodities.some(commodity => 
+                    commodity.toLowerCase().includes(query)
+                )
+            );
+
+            displayResults(results, query);
+        }
+
+        function displayResults(results, query) {
+            resultsInfo.innerHTML = `Found <span class="results-count">${results.length}</span> result${results.length !== 1 ? 's' : ''}`;
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <div class="no-results-icon">🔍</div>
+                        <div>No matching commodities found</div>
+                        <div style="margin-top: 8px; font-size: 0.9rem;">Try a different search term</div>
+                    </div>
+                `;
+                return;
+            }
+
+            resultsContainer.innerHTML = results.map(item => {
+                // Highlight matching commodities
+                const commodityHTML = item.commodities
+                    .map(commodity => {
+                        const lowerCommodity = commodity.toLowerCase();
+                        const lowerQuery = query.toLowerCase();
+                        
+                        if (lowerCommodity.includes(lowerQuery)) {
+                            const index = lowerCommodity.indexOf(lowerQuery);
+                            const before = commodity.substring(0, index);
+                            const match = commodity.substring(index, index + query.length);
+                            const after = commodity.substring(index + query.length);
+                            return `${before}<span class="highlight">${match}</span>${after}`;
+                        }
+                        return commodity;
+                    })
+                    .join(', ');
+
+                return `
+                    <div class="result-item">
+                        <div class="hs-code">${item.hsCode}</div>
+                        <div class="commodity-list">${commodityHTML}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showStatus(message, isError = false) {
+            statusMessage.innerHTML = `
+                <div class="status-message ${isError ? 'error-message' : ''}">
+                    ${message}
+                </div>
+            `;
+            
+            if (!isError) {
+                setTimeout(() => {
+                    statusMessage.innerHTML = '';
+                }, 8000);
+            }
+        }
+    </script>
+</body>
+</html>
